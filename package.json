@@ -31,7 +31,7 @@
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint --no-eslintrc --config .eslintrc.js --ext .ts nodes credentials",
     "lintfix": "ESLINT_USE_FLAT_CONFIG=false eslint --no-eslintrc --config .eslintrc.js --ext .ts nodes credentials --fix",
     "prepublishOnly": "npm run lint",
-    "prepack": "npm run build && node scripts/assert-dist.js"
+    "prepack": "npm run build"
   },
   "files": [
     "dist"

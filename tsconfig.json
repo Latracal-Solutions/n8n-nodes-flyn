@@ -17,6 +17,6 @@
     "useUnknownInCatchVariables": false,
     "skipLibCheck": true
   },
-  "include": ["credentials/**/*", "nodes/**/*"],
+  "include": ["credentials/**/*", "nodes/**/*", "nodes/**/*.json", "package.json"],
   "exclude": ["node_modules", "dist"]
 }
