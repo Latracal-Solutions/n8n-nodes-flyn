@@ -21,7 +21,12 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: npm
-      - run: npm ci
+      # --ignore-scripts is load-bearing. n8n-workflow pulls in isolated-vm, a
+      # native module that fails to compile against Node 20's V8 on the Linux
+      # runners. Nothing here ever runs n8n: lint and tsc need only the
+      # TypeScript types, so skipping install scripts is both correct and much
+      # faster.
+      - run: npm ci --ignore-scripts
       - run: npm run lint
       - run: npm run build
       - name: Confirm the package has no runtime dependencies

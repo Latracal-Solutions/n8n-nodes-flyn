@@ -28,8 +28,13 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
+      # --ignore-scripts is load-bearing. n8n-workflow pulls in isolated-vm, a
+      # native module that fails to compile against Node 20's V8 on the Linux
+      # runners. Nothing here ever runs n8n: lint and tsc need only the
+      # TypeScript types, so skipping install scripts is both correct and much
+      # faster.
       - name: Install
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Lint
         run: npm run lint
