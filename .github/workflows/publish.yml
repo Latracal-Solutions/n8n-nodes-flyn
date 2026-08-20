@@ -33,6 +33,13 @@ jobs:
       # runners. Nothing here ever runs n8n: lint and tsc need only the
       # TypeScript types, so skipping install scripts is both correct and much
       # faster.
+      # The npm bundled with Node 20/22 is 10.x. Trusted publishing (OIDC, no
+      # token at all) needs npm >= 11.5, and provenance is happiest on current
+      # npm too. Upgrading here means BOTH routes work: trusted publisher if one
+      # is configured on npmjs.com, NPM_TOKEN if not.
+      - name: Use current npm
+        run: npm install -g npm@latest
+
       - name: Install
         run: npm ci --ignore-scripts
 
@@ -52,6 +59,9 @@ jobs:
           fi
 
       - name: Publish
+        # NODE_AUTH_TOKEN is only consulted when a secret exists. With a trusted
+        # publisher configured on npmjs.com it is empty and OIDC is used instead,
+        # which is the better setup because there is no long-lived token to leak.
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
