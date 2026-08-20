@@ -1,0 +1,15 @@
+{
+  "node": "n8n-nodes-flyn.flyn",
+  "nodeVersion": "1.0",
+  "codexVersion": "1.0",
+  "categories": ["Marketing & Content", "Utility"],
+  "resources": {
+    "credentialDocumentation": [
+      { "url": "https://www.flyn.to/docs" }
+    ],
+    "primaryDocumentation": [
+      { "url": "https://github.com/Latracal-Solutions/n8n-nodes-flyn#readme" }
+    ]
+  },
+  "alias": ["link", "short link", "url shortener", "shorten", "qr", "qr code", "flyn"]
+}
