@@ -28,6 +28,17 @@ module.exports = {
       files: ['./nodes/**/*.ts'],
       plugins: ['eslint-plugin-n8n-nodes-base'],
       extends: ['plugin:n8n-nodes-base/nodes'],
+      rules: {
+        // These two rules DIRECTLY CONTRADICT the @n8n/community-nodes ruleset
+        // that the Creator Portal's scanner actually enforces
+        // (`npx @n8n/scan-community-package`). eslint-plugin-n8n-nodes-base is
+        // the older plugin and wants the string literal ['main']; the scanner's
+        // `node-connection-type-literal` rule rejects that and requires
+        // NodeConnectionTypes.Main. Submission is gated on the SCANNER, so the
+        // enum wins and these are switched off. Do not "fix" this back.
+        'n8n-nodes-base/node-class-description-inputs-wrong-regular-node': 'off',
+        'n8n-nodes-base/node-class-description-outputs-wrong': 'off',
+      },
     },
   ],
 };

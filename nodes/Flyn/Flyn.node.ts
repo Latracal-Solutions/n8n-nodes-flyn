@@ -5,9 +5,10 @@ import type {
 	INodeType,
 	INodeTypeDescription,
 	IHttpRequestMethods,
-	IRequestOptions,
+	IHttpRequestOptions,
+	JsonObject,
 } from 'n8n-workflow';
-import { NodeOperationError } from 'n8n-workflow';
+import { NodeApiError, NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
 const BASE_URL = 'https://www.flyn.to/api';
 
@@ -23,11 +24,11 @@ async function flynRequest(
 	body: IDataObject = {},
 	qs: IDataObject = {},
 ): Promise<IDataObject> {
-	const options: IRequestOptions = {
+	const options: IHttpRequestOptions = {
 		method,
 		body,
 		qs,
-		uri: `${BASE_URL}${endpoint}`,
+		url: `${BASE_URL}${endpoint}`,
 		json: true,
 	};
 
@@ -36,7 +37,7 @@ async function flynRequest(
 	}
 
 	try {
-		return (await this.helpers.requestWithAuthentication.call(
+		return (await this.helpers.httpRequestWithAuthentication.call(
 			this,
 			'flynApi',
 			options,
@@ -46,10 +47,10 @@ async function flynRequest(
 		// a free account hitting the 25 links/month cap gets `code:
 		// UPGRADE_REQUIRED` plus an upgradeUrl, which is far more actionable than
 		// "403".
-		const apiMessage =
-			(error as { error?: { error?: string } }).error?.error ??
-			(error as { message?: string }).message;
-		throw new NodeOperationError(this.getNode(), apiMessage ?? 'Flyn API request failed');
+		// Flyn's plan gates return a structured body worth surfacing intact: a free
+		// account hitting the 25 links/month cap gets code UPGRADE_REQUIRED and an
+		// upgradeUrl, which is far more useful in a run log than "403".
+		throw new NodeApiError(this.getNode(), error as JsonObject);
 	}
 }
 
@@ -57,14 +58,17 @@ export class Flyn implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Flyn',
 		name: 'flyn',
-		icon: 'file:flyn.svg',
+		icon: { light: 'file:flyn.svg', dark: 'file:flyn.dark.svg' },
 		group: ['transform'],
 		version: 1,
+		// An AI agent can legitimately drive this: shortening a URL and reading its
+		// click count are self-contained, side-effect-light operations.
+		usableAsTool: true,
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
 		description: 'Create, update and track Flyn short links and QR codes',
 		defaults: { name: 'Flyn' },
-		inputs: ['main'],
-		outputs: ['main'],
+		inputs: [NodeConnectionTypes.Main],
+		outputs: [NodeConnectionTypes.Main],
 		credentials: [{ name: 'flynApi', required: true }],
 		properties: [
 			{
@@ -265,8 +269,8 @@ export class Flyn implements INodeType {
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const items = this.getInputData();
 		const returnData: INodeExecutionData[] = [];
-		const resource = this.getNodeParameter('resource', 0) as string;
-		const operation = this.getNodeParameter('operation', 0) as string;
+		const resource = this.getNodeParameter('resource', 0);
+		const operation = this.getNodeParameter('operation', 0);
 
 		for (let i = 0; i < items.length; i++) {
 			try {
@@ -274,19 +278,19 @@ export class Flyn implements INodeType {
 
 				if (resource === 'link') {
 					if (operation === 'create') {
-						const body: IDataObject = { url: this.getNodeParameter('url', i) as string };
-						const extra = this.getNodeParameter('additionalFields', i) as IDataObject;
+						const body: IDataObject = { url: this.getNodeParameter('url', i) };
+						const extra = this.getNodeParameter('additionalFields', i);
 						Object.assign(body, normalizeFields(extra));
 						responseData = await flynRequest.call(this, 'POST', '/links', body);
 					} else if (operation === 'get') {
 						const id = this.getNodeParameter('linkId', i) as string;
 						responseData = await flynRequest.call(this, 'GET', `/links/${encodeURIComponent(id)}`);
 					} else if (operation === 'getAll') {
-						const returnAll = this.getNodeParameter('returnAll', i) as boolean;
-						const filters = this.getNodeParameter('filters', i) as IDataObject;
+						const returnAll = this.getNodeParameter('returnAll', i);
+						const filters = this.getNodeParameter('filters', i);
 						const qs: IDataObject = { ...filters };
 						if (!returnAll) {
-							qs.limit = this.getNodeParameter('limit', i) as number;
+							qs.limit = this.getNodeParameter('limit', i);
 						}
 						const res = await flynRequest.call(this, 'GET', '/links', {}, qs);
 						// The API wraps the collection; hand n8n the array so each link
@@ -294,7 +298,7 @@ export class Flyn implements INodeType {
 						responseData = (res.links ?? res.data ?? res) as IDataObject[];
 					} else if (operation === 'update') {
 						const id = this.getNodeParameter('linkId', i) as string;
-						const extra = this.getNodeParameter('additionalFields', i) as IDataObject;
+						const extra = this.getNodeParameter('additionalFields', i);
 						responseData = await flynRequest.call(
 							this,
 							'PATCH',
@@ -308,7 +312,7 @@ export class Flyn implements INodeType {
 					}
 				} else if (resource === 'qrCode') {
 					const id = this.getNodeParameter('linkId', i) as string;
-					const options = this.getNodeParameter('options', i) as IDataObject;
+					const options = this.getNodeParameter('options', i);
 					responseData = await flynRequest.call(
 						this,
 						'GET',
@@ -328,7 +332,11 @@ export class Flyn implements INodeType {
 					returnData.push({ json: { error: (error as Error).message }, pairedItem: { item: i } });
 					continue;
 				}
-				throw error;
+				// Always wrap, never re-throw raw. flynRequest already raises a
+				// NodeApiError carrying Flyn's own message; anything else reaching here
+				// is a bug in this node. Either way n8n needs the node's identity
+				// attached so the run log names Flyn and points at the failing item.
+				throw new NodeOperationError(this.getNode(), error as Error, { itemIndex: i });
 			}
 		}
 

@@ -1,5 +1,6 @@
 import type {
 	IAuthenticateGeneric,
+	Icon,
 	ICredentialTestRequest,
 	ICredentialType,
 	INodeProperties,
@@ -9,6 +10,10 @@ export class FlynApi implements ICredentialType {
 	name = 'flynApi';
 
 	displayName = 'Flyn API';
+
+	// Both variants supplied: the brand green is too dark to read on n8n's dark
+	// canvas, so the dark file uses the lighter green the app itself switches to.
+	icon: Icon = { light: 'file:flyn.svg', dark: 'file:flyn.dark.svg' };
 
 	documentationUrl = 'https://www.flyn.to/docs';
 

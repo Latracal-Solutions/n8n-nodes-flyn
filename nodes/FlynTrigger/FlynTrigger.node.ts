@@ -5,10 +5,11 @@ import type {
 	INodeTypeDescription,
 	IWebhookFunctions,
 	IWebhookResponseData,
-	IRequestOptions,
+	IHttpRequestOptions,
 	IHttpRequestMethods,
+	JsonObject,
 } from 'n8n-workflow';
-import { NodeOperationError } from 'n8n-workflow';
+import { NodeApiError, NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
 const BASE_URL = 'https://www.flyn.to/api';
 
@@ -18,25 +19,25 @@ async function flynRequest(
 	endpoint: string,
 	body: IDataObject = {},
 ): Promise<IDataObject> {
-	const options: IRequestOptions = {
+	const options: IHttpRequestOptions = {
 		method,
 		body,
-		uri: `${BASE_URL}${endpoint}`,
+		url: `${BASE_URL}${endpoint}`,
 		json: true,
 	};
 	if (Object.keys(body).length === 0) delete options.body;
 
 	try {
-		return (await this.helpers.requestWithAuthentication.call(
+		return (await this.helpers.httpRequestWithAuthentication.call(
 			this,
 			'flynApi',
 			options,
 		)) as IDataObject;
 	} catch (error) {
-		const apiMessage =
-			(error as { error?: { error?: string } }).error?.error ??
-			(error as { message?: string }).message;
-		throw new NodeOperationError(this.getNode(), apiMessage ?? 'Flyn API request failed');
+		// Flyn's plan gates return a structured body worth surfacing intact: a free
+		// account hitting the 25 links/month cap gets code UPGRADE_REQUIRED and an
+		// upgradeUrl, which is far more useful in a run log than "403".
+		throw new NodeApiError(this.getNode(), error as JsonObject);
 	}
 }
 
@@ -44,14 +45,14 @@ export class FlynTrigger implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Flyn Trigger',
 		name: 'flynTrigger',
-		icon: 'file:flyn.svg',
+		icon: { light: 'file:flyn.svg', dark: 'file:flyn.dark.svg' },
 		group: ['trigger'],
 		version: 1,
 		subtitle: '={{$parameter["events"].join(", ")}}',
 		description: 'Starts a workflow when something happens to a Flyn link',
 		defaults: { name: 'Flyn Trigger' },
 		inputs: [],
-		outputs: ['main'],
+		outputs: [NodeConnectionTypes.Main],
 		credentials: [{ name: 'flynApi', required: true }],
 		webhooks: [
 			{
@@ -136,9 +137,15 @@ export class FlynTrigger implements INodeType {
 
 				try {
 					await flynRequest.call(this, 'DELETE', `/webhooks/${encodeURIComponent(id)}`);
-				} catch {
-					// Already gone, or the key lost access. Either way the local state
-					// must be cleared or n8n will never try to register again.
+				} catch (error) {
+					// Usually the webhook is already gone, or the key lost access, and
+					// either way the local state below must still be cleared or n8n will
+					// never re-register. But swallowing this silently hides the case that
+					// matters: Flyn still holding a subscription that now posts into the
+					// void. Log it so it is visible, then let n8n retry the deletion.
+					this.logger.warn(
+						`Flyn Trigger: could not delete webhook ${id}: ${(error as Error).message}`,
+					);
 					return false;
 				} finally {
 					delete staticData.webhookId;
@@ -148,10 +155,13 @@ export class FlynTrigger implements INodeType {
 		},
 	};
 
-	async webhook(this: IWebhookFunctions): Promise<IWebhookResponseData> {
-		const body = this.getBodyData() as IDataObject;
-		return {
+	// Not `async`: there is nothing to await, and n8n only requires that this
+	// returns a Promise. Marking it async would be a lie the linter rightly
+	// objects to.
+	webhook(this: IWebhookFunctions): Promise<IWebhookResponseData> {
+		const body = this.getBodyData();
+		return Promise.resolve({
 			workflowData: [this.helpers.returnJsonArray([body])],
-		};
+		});
 	}
 }
