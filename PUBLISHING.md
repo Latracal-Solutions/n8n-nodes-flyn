@@ -1,5 +1,17 @@
 # Publishing
 
+## Provenance is mandatory, not a nicety
+
+n8n's docs are explicit: from 1 May 2026, nodes submitted for Creator Portal
+verification **must** be published by a GitHub Actions workflow carrying a
+provenance statement, and "n8n won't accept verified nodes published directly
+from a local machine."
+
+`0.1.0` was published from a laptop to bring the package into existence, because
+npm will not attach a trusted publisher to a package that does not exist yet.
+That version is therefore **not submittable for verification**. Every release
+from `0.1.1` onward goes through the tag and the workflow.
+
 Everything is ready except npm authentication, which has to be done by a human
 holding the npm account. Pick one route.
 
