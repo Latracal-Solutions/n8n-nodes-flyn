@@ -1,0 +1,59 @@
+{
+  "name": "n8n-nodes-flyn",
+  "version": "0.1.0",
+  "description": "n8n community node for Flyn: create, update and track short links and QR codes, and trigger workflows on link events.",
+  "keywords": [
+    "n8n-community-node-package",
+    "n8n",
+    "flyn",
+    "url-shortener",
+    "short-links",
+    "qr-code",
+    "link-analytics"
+  ],
+  "license": "MIT",
+  "homepage": "https://www.flyn.to",
+  "author": {
+    "name": "Flyn",
+    "email": "hello@flyn.to"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Latracal-Solutions/n8n-nodes-flyn.git"
+  },
+  "engines": {
+    "node": ">=20.15"
+  },
+  "main": "index.js",
+  "scripts": {
+    "build": "npx rimraf dist && tsc && node copy-icons.js",
+    "dev": "tsc --watch",
+    "lint": "ESLINT_USE_FLAT_CONFIG=false eslint --no-eslintrc --config .eslintrc.js --ext .ts nodes credentials",
+    "lintfix": "ESLINT_USE_FLAT_CONFIG=false eslint --no-eslintrc --config .eslintrc.js --ext .ts nodes credentials --fix",
+    "prepublishOnly": "npm run build && npm run lint"
+  },
+  "files": [
+    "dist"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [
+      "dist/credentials/FlynApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/Flyn/Flyn.node.js",
+      "dist/nodes/FlynTrigger/FlynTrigger.node.js"
+    ]
+  },
+  "devDependencies": {
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-n8n-nodes-base": "^1.16.3",
+    "n8n-workflow": "*",
+    "rimraf": "^5.0.5",
+    "typescript": "^5.5.0"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  }
+}

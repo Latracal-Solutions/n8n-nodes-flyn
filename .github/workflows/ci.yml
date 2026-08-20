@@ -1,0 +1,33 @@
+# Lint and build on every push and PR. The lint step is the one that matters:
+# n8n's review runs eslint-plugin-n8n-nodes-base, and a rule violation is the
+# most common reason a community node bounces.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ['20', '22']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - name: Confirm the package has no runtime dependencies
+        run: |
+          DEPS="$(node -p "Object.keys(require('./package.json').dependencies ?? {}).length")"
+          if [ "$DEPS" != "0" ]; then
+            echo "n8n community nodes must ship zero runtime dependencies, found $DEPS" >&2
+            exit 1
+          fi
