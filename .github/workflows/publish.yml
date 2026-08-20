@@ -25,7 +25,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # Node 22, not 20, deliberately. npm's trusted publishing (OIDC) requires
+          # npm >= 11.5.1 AND Node >= 22.14.0, so a Node 20 runner cannot use it at
+          # all and would silently fall back to needing a token.
+          node-version: '22'
           registry-url: 'https://registry.npmjs.org'
 
       # --ignore-scripts is load-bearing. n8n-workflow pulls in isolated-vm, a
