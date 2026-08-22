@@ -1,4 +1,5 @@
 import type {
+	IBinaryKeyData,
 	IDataObject,
 	IExecuteFunctions,
 	INodeExecutionData,
@@ -275,6 +276,9 @@ export class Flyn implements INodeType {
 		for (let i = 0; i < items.length; i++) {
 			try {
 				let responseData: IDataObject | IDataObject[] = {};
+				// Set only by the QR branch. n8n renders binary as a preview, so a QR
+				// code arrives as a viewable image rather than a wall of base64.
+				let binary: IBinaryKeyData | undefined;
 
 				if (resource === 'link') {
 					if (operation === 'create') {
@@ -313,19 +317,50 @@ export class Flyn implements INodeType {
 				} else if (resource === 'qrCode') {
 					const id = this.getNodeParameter('linkId', i) as string;
 					const options = this.getNodeParameter('options', i);
-					responseData = await flynRequest.call(
+					const res = await flynRequest.call(
 						this,
 						'GET',
 						`/links/${encodeURIComponent(id)}/qr`,
 						{},
 						options,
 					);
+
+					// Flyn returns the image as a data URL in `qrDataUrl`. Passing that
+					// through as JSON is technically complete but useless in practice: a
+					// several-kilobyte base64 string fills the output table and cannot be
+					// fed to anything that expects a file. Decode it to binary, which is
+					// what n8n does for every other node that returns an image, and the
+					// editor renders a preview while downstream nodes can attach or upload
+					// it directly.
+					const dataUrl = typeof res.qrDataUrl === 'string' ? res.qrDataUrl : '';
+					const parsed = /^data:([^;,]+);base64,(.+)$/.exec(dataUrl);
+					if (parsed) {
+						const [, mimeType, base64] = parsed;
+						const extension = mimeType === 'image/svg+xml' ? 'svg' : 'png';
+						binary = {
+							data: await this.helpers.prepareBinaryData(
+								Buffer.from(base64, 'base64'),
+								`flyn-qr-${id}.${extension}`,
+								mimeType,
+							),
+						};
+					}
+
+					// Drop the data URL from the JSON now that the bytes live in binary.
+					// Keeping both would leave the same payload in the output twice, and
+					// the copy nobody can use is the noisy one.
+					const { qrDataUrl, ...rest } = res;
+					void qrDataUrl;
+					responseData = rest;
 				}
 
 				const executionData = this.helpers.constructExecutionMetaData(
 					this.helpers.returnJsonArray(responseData),
 					{ itemData: { item: i } },
 				);
+				if (binary) {
+					for (const entry of executionData) entry.binary = binary;
+				}
 				returnData.push(...executionData);
 			} catch (error) {
 				if (this.continueOnFail()) {

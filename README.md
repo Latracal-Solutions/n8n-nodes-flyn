@@ -35,7 +35,9 @@ This package ships two nodes.
 
 **QR Code**
 
-- **Get** the QR code for a link, as PNG or SVG, at any size from 64 to 2048 pixels.
+- **Get** the QR code for a link, as PNG or SVG, at any size from 64 to 2048 pixels. The
+  image comes back as binary data, so n8n previews it in the editor and you can attach it
+  to an email, upload it, or write it to disk without decoding anything yourself.
 
 ### Flyn Trigger
 
